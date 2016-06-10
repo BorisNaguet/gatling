@@ -27,4 +27,4 @@ cache:
 # whitelist
 branches:
   only:
-    - master
+    - ws-multi-checks
