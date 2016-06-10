@@ -1,4 +1,4 @@
-# Gatling [![Build Status](https://travis-ci.org/BorisNaguet/gatling.svg?branch=master)](https://travis-ci.org/BorisNaguet/gatling)
+# Gatling [![Build Status](https://travis-ci.org/BorisNaguet/gatling.svg?branch=ws-multi-checks)](https://travis-ci.org/BorisNaguet/gatling)
 
 ## What is Gatling ?
 
