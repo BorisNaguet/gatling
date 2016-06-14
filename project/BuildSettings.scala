@@ -23,6 +23,13 @@ object BuildSettings {
     // [fl]
   )
 
+  publishTo := {
+    if (isSnapshot.value)
+      Some("snapshots" at sys.props.getOrElse("kazan-snapshot-repo-url", ""))
+    else
+      Some("releases"  at sys.props.getOrElse("kazan-release-repo-url", ""))
+  }
+
   lazy val gatlingModuleSettings =
     basicSettings ++ scaladocSettings
 
