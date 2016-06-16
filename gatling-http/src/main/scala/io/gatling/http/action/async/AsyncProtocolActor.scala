@@ -16,12 +16,12 @@
 package io.gatling.http.action.async
 
 import scala.collection.mutable
-import io.gatling.commons.stats.{KO, OK, Status}
+import io.gatling.commons.stats.{ KO, OK, Status }
 import io.gatling.commons.util.Maps._
 import io.gatling.commons.util.TimeHelper._
 import io.gatling.core.action.Action
 import io.gatling.core.akka.BaseActor
-import io.gatling.core.check.{Check, CheckResult}
+import io.gatling.core.check.{ Check, CheckResult }
 import io.gatling.core.session.Session
 import io.gatling.core.stats.StatsEngine
 import io.gatling.core.stats.message.ResponseTimings
@@ -29,9 +29,9 @@ import io.gatling.http.check.async.AsyncCheck
 
 abstract class AsyncProtocolActor(statsEngine: StatsEngine) extends BaseActor {
   /**
-    * These checks are not bound to an instance of AsyncTx
-    */
-  protected val accumulatedChecks = mutable.ArrayBuffer.empty[AsyncCheck]
+   * These checks are not bound to an instance of AsyncTx
+   */
+  protected var accumulatedChecks = Seq.empty[AsyncCheck]
 
   protected type NextTxBasedBehaviour = AsyncTx => this.Receive
 
@@ -47,8 +47,8 @@ abstract class AsyncProtocolActor(statsEngine: StatsEngine) extends BaseActor {
 
   protected def failAccumulatedCheck(tx: AsyncTx, check: AsyncCheck, message: String): AsyncTx = {
     //tx.requestName can have changed after the check has been created
-    logResponse(tx.session, check.name.getOrElse("check"), KO, check.timestamp, nowMillis, Some(message))
-    accumulatedChecks -= check
+    logResponse(tx.session, check.name.getOrElse("unnamed check failed"), KO, check.timestamp, nowMillis, Some(message))
+    accumulatedChecks = accumulatedChecks :+ check
 
     //no change needed in tx
     tx
@@ -58,20 +58,28 @@ abstract class AsyncProtocolActor(statsEngine: StatsEngine) extends BaseActor {
                          next: Action, session: Session, nextState: NextTxBasedBehaviour): Unit = {
     logger.debug(s"setCheck blocking=${check.blocking} timeout=${check.timeout}")
 
-    // schedule timeout
-    scheduler.scheduleOnce(check.timeout) {
-      self ! CheckTimeout(check)
-    }
-
-    if(check.accumulate) {
+    if (check.accumulate) {
       //tx may have changed when the check if verified, so we need to set the tx name in the AsyncCheck.name
-      val namedCheck = check.copy(name = Some(tx.requestName))
-      accumulatedChecks += namedCheck
+      val namedCheck = check.copy(name = Some(requestName))
+      accumulatedChecks = accumulatedChecks :+ namedCheck
+
+      // schedule timeout
+      scheduler.scheduleOnce(check.timeout) {
+        self ! CheckTimeout(namedCheck)
+      }
+
+      val newTx = tx.applyUpdates(session)
+        .copy(next = next)
+      context.become(nextState(newTx))
 
       //'accumulated' checks should all be non-blocking (enforced by the DSL)
-      next ! tx.session
-    }
-    else {
+      next ! newTx.session
+    } else {
+      // schedule timeout
+      scheduler.scheduleOnce(check.timeout) {
+        self ! CheckTimeout(check)
+      }
+
       val newTx = failPendingCheck(tx, "Check didn't succeed by the time a new one was set up")
         .applyUpdates(session)
         .copy(requestName = requestName, start = nowMillis, check = Some(check), pendingCheckSuccesses = Nil, next = next)
@@ -106,7 +114,7 @@ abstract class AsyncProtocolActor(statsEngine: StatsEngine) extends BaseActor {
   }
 
   protected def succeedAccumulatedCheck(check: AsyncCheck, tx: AsyncTx, results: List[CheckResult], nextState: NextTxBasedBehaviour): Unit = {
-    val newUpdates = succeedCheck(check.name.getOrElse("check"), check.timestamp, tx, results)
+    val newUpdates = succeedCheck(check.name.getOrElse("unnamed check succeed"), check.timestamp, tx, results)
 
     //'accumulated' checks should all be non-blocking (enforced by the DSL)
 

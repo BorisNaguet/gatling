@@ -54,17 +54,16 @@ trait AsyncCheckDSL {
     def expect(range: Range) = new CheckTypeStep(false, timeout, ExpectedRange(range))
 
     /**
-      * Checks of this type will all be kept until they're matched by any async server message, or they timeout
-      *
-      * until/expect can't be used: they're necessarily checked until they're ok once
-      *
-      * can only be called on 'wsListen'/non blocking step
-      *
-      * Implemented ONLY on Websocket - NOT on SSE
-      */
+     * Checks of this type will all be kept until they're matched by any async server message, or they timeout
+     *
+     * until/expect can't be used: they're necessarily checked until they're ok once
+     *
+     * can only be called on 'wsListen'/non blocking step
+     *
+     * Implemented ONLY on Websocket - NOT on SSE
+     */
     def accumulate = new CheckTypeStep(false, timeout, UntilCount(1), true)
   }
-
 
   class CheckTypeStep(await: Boolean, timeout: FiniteDuration, expectation: Expectation, shouldAccumulate: Boolean = false) {
 

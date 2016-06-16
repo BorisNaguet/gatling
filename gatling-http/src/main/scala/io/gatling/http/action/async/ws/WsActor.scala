@@ -127,11 +127,13 @@ class WsActor(wsName: String, statsEngine: StatsEngine, httpEngine: HttpEngine) 
         next ! newTx.session
 
       case CheckTimeout(check) if check.accumulate =>
-        logger.debug(s"Check Accumulated on WebSocket '$wsName' timed out")
+        if (accumulatedChecks.contains(check)) {
+          logger.debug(s"Check Accumulated on WebSocket '$wsName' timed out")
 
-        //accumulated checks are always UntilCount(1)
-        val newTx = failAccumulatedCheck(tx, check, "Check accumulated: Timeout")
-        context.become(openState(webSocket, newTx))
+          //accumulated checks are always UntilCount(1)
+          val newTx = failAccumulatedCheck(tx, check, "Check accumulated: Timeout")
+          context.become(openState(webSocket, newTx))
+        }
 
       //'accumulated' checks should all be non-blocking (enforced by the DSL)
 
@@ -161,16 +163,18 @@ class WsActor(wsName: String, statsEngine: StatsEngine, httpEngine: HttpEngine) 
       case OnTextMessage(message, time) =>
         logger.debug(s"Received text message on websocket '$wsName':$message")
 
-        accumulatedChecks.foreach{ check =>
+        accumulatedChecks = accumulatedChecks.filter({ check =>
           implicit val cache = mutable.Map.empty[Any, Any]
 
           check.check(message, tx.session) match {
             case Success(result) =>
               succeedAccumulatedCheck(check, tx, List(result), goToOpenState(webSocket))
+              false
 
             case _ =>
+              true
           }
-        }
+        })
 
         tx.check.foreach { check =>
 
