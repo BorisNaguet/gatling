@@ -31,7 +31,7 @@ abstract class AsyncProtocolActor(statsEngine: StatsEngine) extends BaseActor {
   /**
    * These checks are not bound to an instance of AsyncTx
    */
-  protected var accumulatedChecks = Seq.empty[AsyncCheck]
+  protected var accumulatedChecks = Set.empty[AsyncCheck]
 
   protected type NextTxBasedBehaviour = AsyncTx => this.Receive
 
@@ -48,7 +48,7 @@ abstract class AsyncProtocolActor(statsEngine: StatsEngine) extends BaseActor {
   protected def failAccumulatedCheck(tx: AsyncTx, check: AsyncCheck, message: String): AsyncTx = {
     //tx.requestName can have changed after the check has been created
     logResponse(tx.session, check.name.getOrElse("unnamed check failed"), KO, check.timestamp, nowMillis, Some(message))
-    accumulatedChecks = accumulatedChecks :+ check
+    accumulatedChecks = accumulatedChecks - check
 
     //no change needed in tx
     tx
@@ -61,7 +61,7 @@ abstract class AsyncProtocolActor(statsEngine: StatsEngine) extends BaseActor {
     if (check.accumulate) {
       //tx may have changed when the check if verified, so we need to set the tx name in the AsyncCheck.name
       val namedCheck = check.copy(name = Some(requestName))
-      accumulatedChecks = accumulatedChecks :+ namedCheck
+      accumulatedChecks = accumulatedChecks + namedCheck
 
       // schedule timeout
       scheduler.scheduleOnce(check.timeout) {
