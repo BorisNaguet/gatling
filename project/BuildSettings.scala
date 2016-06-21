@@ -14,7 +14,15 @@ object BuildSettings {
   lazy val basicSettings = Seq(
     license := ApacheV2,
     githubPath := "gatling/gatling",
-    projectDevelopers := developers
+    projectDevelopers := developers,
+    publishTo := {
+      val nexus = "https://kazan.priv.atos.fr/nexus/content/repositories/"
+      if (isSnapshot.value)
+        Some("snapshots" at nexus + "snapshots/")
+      else
+        Some("releases"  at nexus + "releases/")
+    },
+    credentials += Credentials(Path.userHome / ".sbt" / ".credentials")
     // [fl]
     //
     //
